@@ -9,8 +9,7 @@
 - **Golang**: Backend dasturlash tili.
 - **gRPC**: Mikroservislar o'rtasida samarali aloqa uchun.
 - **Protocol Buffers**: Ma'lumotlarni seriyalash va deserializatsiya qilish uchun.
-- **PostgreSQL**: Foydalanuvchi ma'lumotlarini saqlash uchun.
-- **MongoDB**: Tvitlar va boshqa dinamik ma'lumotlarni saqlash uchun.
+- **PostgreSQL**: Barcha ma'lumotlarni saqlash uchun asosiy ma'lumotlar bazasi.
 - **Gin framework**: API Gateway uchun RESTful xizmatlarni yaratish.
 - **Golang-Migrate**: Ma'lumotlar bazasi migratsiyalari uchun.
 - **Swagger**: API hujjatlarini yaratish va boshqarish uchun.
@@ -75,62 +74,85 @@
 
 ## Ma'lumotlar Bazasi Sxemalari
 
-### PostgreSQL (Auth va User Service uchun)
+### PostgreSQL
 
-**Users jadvali:**
-- `id` (UUID, asosiy kalit)
-- `email` (string, noyob)
-- `password_hash` (string)
-- `username` (string, noyob)
-- `first_name` (string)
-- `last_name` (string)
-- `bio` (string)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
+```sql
+-- Users jadvali
+CREATE TABLE Users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    first_name VARCHAR(50),
+    last_name VARCHAR(50),
+    bio TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP DEFAULT NULL
+);
 
-### MongoDB (Tweet, Comment, Like va Notification Service uchun)
+-- Tweets jadvali
+CREATE TABLE Tweets (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
+    tweet_serial INT NOT NULL,
+    content TEXT NOT NULL,
+    likes_count INT DEFAULT 0,
+    comments_count INT DEFAULT 0,
+    views_count INT DEFAULT 0,
+    repost_count INT DEFAULT 0,
+    shares_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP DEFAULT NULL,
+    UNIQUE(user_id, tweet_serial)
+);
 
-**Tweets to'plami:**
-- `_id` (ObjectId)
-- `user_id` (UUID, Users jadvaliga havola)
-- `content` (string)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-- `likes_count` (int)
+-- Comments jadvali
+CREATE TABLE Comments (
+    id SERIAL PRIMARY KEY,
+    tweet_id INT REFERENCES Tweets(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
+    comment_serial INT NOT NULL,
+    content TEXT NOT NULL,
+    likes_count INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP DEFAULT NULL,
+    UNIQUE(user_id, comment_serial)
+);
 
-**Comments to'plami:**
-- `_id` (ObjectId)
-- `tweet_id` (ObjectId, Tweets to'plamiga havola)
-- `user_id` (UUID, Users jadvaliga havola)
-- `content` (string)
-- `created_at` (timestamp)
-- `updated_at` (timestamp)
-- `likes_count` (int)
+-- Likes jadvali
+CREATE TABLE Likes (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
+    target_id INT NOT NULL,
+    target_type VARCHAR(10) CHECK (target_type IN ('tweet', 'comment')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP DEFAULT NULL
+);
 
-**Likes to'plami:**
-- `_id` (ObjectId)
-- `user_id` (UUID, Users jadvaliga havola)
-- `target_id` (ObjectId, Tweets yoki Comments to'plamiga havola)
-- `target_type` (enum: tweet, comment)
-- `created_at` (timestamp)
+-- Notifications jadvali
+CREATE TABLE Notifications (
+    id SERIAL PRIMARY KEY,
+    user_id UUID REFERENCES Users(id) ON DELETE CASCADE,
+    type VARCHAR(10) CHECK (type IN ('like', 'comment', 'follow', 'mention')),
+    message TEXT NOT NULL,
+    read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP DEFAULT NULL
+);
 
-**Notifications to'plami:**
-- `_id` (ObjectId)
-- `user_id` (UUID, Users jadvaliga havola)
-- `type` (enum: like, comment, follow, mention)
-- `message` (string)
-- `read` (bool)
-- `created_at` (timestamp)
+
+```
 
 ## Qo'shimcha Talablar
-
-- **Xatoliklarni boshqarish**: Har bir servis uchun to'g'ri xatoliklarni boshqarish va jurnallash tizimini joriy etish.
-- **gRPC xizmatlari**: Servislar o'rtasida gRPC orqali aloqa o'rnatish.
-- **JWT autentifikatsiyasi**: API Gateway uchun JWT autentifikatsiyasini amalga oshirish.
-- **Casbin orqali kirish nazorati**: Rolga asoslangan kirish nazorati uchun Casbin'dan foydalanish.
-- **Ma'lumotlar bazasi migratsiyalari**: PostgreSQL uchun golang-migrate orqali migratsiyalarni amalga oshirish.
-- **Keshirlash**: Redis orqali tez-tez murojaat qilinadigan ma'lumotlarni keshirlash.
-- **Docker**: Barcha servislarni Docker yordamida konteynerlash va mahalliy joylashtirish uchun docker-compose faylini yaratish.
-- **Unit testlar**: Har bir servis uchun birlamchi testlar yozish.
-
-Ushbu spesifikatsiyalar loyihani samarali boshqarish, yuqori sifatli va barqaror tizim yaratish uchun yo'riqnoma sifatida xizmat qiladi.
+- Xatoliklarni boshqarish: Har bir servis uchun to'g'ri xatoliklarni boshqarish va jurnallash tizimini joriy etish.
+- gRPC xizmatlari: Servislar o'rtasida gRPC orqali aloqa o'rnatish.
+- JWT autentifikatsiyasi: API Gateway uchun JWT autentifikatsiyasini amalga oshirish.
+- Casbin orqali kirish nazorati: Rolga asoslangan kirish nazorati uchun Casbin'dan foydalanish.
+- Ma'lumotlar bazasi migratsiyalari: PostgreSQL uchun golang-migrate orqali migratsiyalarni amalga oshirish.
+- Keshirlash: Redis orqali tez-tez murojaat qilinadigan ma'lumotlarni keshirlash.
+- Docker: Barcha servislarni Docker yordamida konteynerlash va mahalliy joylashtirish uchun docker-compose faylini yaratish.
+- Unit testlar: Har bir servis uchun birlamchi testlar yozish.
+- Ushbu spesifikatsiyalar loyihani samarali boshqarish, yuqori sifatli va barqaror tizim yaratish uchun yo'riqnoma sifatida xizmat qiladi.
