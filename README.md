@@ -91,6 +91,18 @@ CREATE TABLE Users (
     deleted_at TIMESTAMP DEFAULT NULL
 );
 
+-- FollowRequests jadvali
+CREATE TABLE FollowRequests (
+    id SERIAL PRIMARY KEY,
+    follower_id UUID REFERENCES Users(id) ON DELETE CASCADE,  -- So'rov jo'natgan foydalanuvchi ID'si
+    following_id UUID REFERENCES Users(id) ON DELETE CASCADE, -- So'rov qabul qilinishi kerak bo'lgan foydalanuvchi ID'si
+    status VARCHAR(10) CHECK (status IN ('pending', 'accepted', 'rejected')) DEFAULT 'pending',  -- So'rov holati
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(follower_id, following_id)  -- Har bir so'rov yagona bo'lishi kerak
+);
+
+
 -- Tweets jadvali
 CREATE TABLE Tweets (
     id SERIAL PRIMARY KEY,
